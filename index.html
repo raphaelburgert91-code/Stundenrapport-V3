@@ -1,0 +1,96 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+    <meta name="theme-color" content="#2f6f5e">
+    <meta name="description" content="Einfache Arbeitszeiterfassung fur Christiane Burgert">
+    <link rel="apple-touch-icon" href="icons/icon-192.png">
+    <title>Arbeitsstunden</title>
+    <link rel="manifest" href="manifest.json">
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="app-header">
+      <div>
+        <p class="eyebrow" id="appSubtitle">Arbeitszeiterfassung ab 2026</p>
+        <h1>Christiane Burgert</h1>
+      </div>
+      <div class="week-picker">
+        <label for="weekSelect">Jahr / KW</label>
+        <select id="weekSelect" aria-label="Kalenderwoche auswählen"></select>
+      </div>
+    </header>
+
+    <main>
+      <section class="dashboard" aria-label="Ubersicht">
+        <article class="metric">
+          <span>Woche</span>
+          <strong id="weekRange">-</strong>
+        </article>
+        <article class="metric">
+          <span>Wochensumme</span>
+          <strong id="weekTotal">0,00 h</strong>
+        </article>
+        <article class="metric">
+          <span>Soll</span>
+          <strong>20,44 h</strong>
+        </article>
+        <article class="metric balance" id="weekBalanceCard">
+          <span>Plus / Minus</span>
+          <strong id="weekBalance">0,00 h</strong>
+        </article>
+        <article class="metric">
+          <label class="metric-label" for="startCarryInput">Start-Übertrag</label>
+          <div class="carry-input-wrap">
+            <input id="startCarryInput" class="carry-input" type="text" inputmode="decimal" autocomplete="off" aria-label="Start-Übertrag in Stunden">
+            <span>h</span>
+          </div>
+        </article>
+        <article class="metric balance" id="carryBalanceCard">
+          <span>Übertrag gesamt</span>
+          <strong id="carryBalance">36,12 h</strong>
+        </article>
+      </section>
+
+      <nav class="tabbar" aria-label="Ansichten">
+        <button class="tab active" data-view="entryView" type="button">Eingabe</button>
+        <button class="tab" data-view="reportView" type="button">Rapport</button>
+      </nav>
+
+      <section id="entryView" class="view active" aria-label="Wochen-Eingabe">
+        <div id="dayCards" class="day-grid"></div>
+      </section>
+
+      <section id="reportView" class="view" aria-label="Rapport">
+        <div class="actions no-print">
+          <button id="printButton" class="primary" type="button">Wochenrapport drucken / PDF</button>
+          <button id="exportButton" type="button">Daten exportieren</button>
+          <button id="backupButton" type="button">Backup speichern</button>
+          <label class="import-button" for="importInput">Backup laden</label>
+          <input id="importInput" class="file-input" type="file" accept="application/json,.json">
+        </div>
+        <article id="report" class="report"></article>
+      </section>
+    </main>
+
+    <template id="dayTemplate">
+      <article class="day-card">
+        <header class="day-head">
+          <div>
+            <h2></h2>
+            <p></p>
+          </div>
+          <strong class="day-total">0,00 h</strong>
+        </header>
+        <div class="entries"></div>
+        <label class="remarks">
+          <span>Bemerkungen</span>
+          <textarea rows="2" inputmode="text"></textarea>
+        </label>
+      </article>
+    </template>
+
+    <script src="app.js" defer></script>
+  </body>
+</html>
