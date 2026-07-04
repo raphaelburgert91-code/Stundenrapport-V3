@@ -238,6 +238,20 @@ button {
   white-space: nowrap;
 }
 
+.report-notice {
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid #c7d8cf;
+  border-radius: 8px;
+  background: #eef8f2;
+  color: var(--brand-strong);
+  font-weight: 800;
+}
+
+.report-notice[hidden] {
+  display: none;
+}
+
 .import-button {
   display: inline-flex;
   align-items: center;
@@ -681,6 +695,10 @@ textarea {
   }
 
   .actions {
+    display: none !important;
+  }
+
+  .report-notice {
     display: none !important;
   }
 

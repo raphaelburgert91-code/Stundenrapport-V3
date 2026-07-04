@@ -52,8 +52,10 @@
   const monthlyTableBody = document.getElementById("monthlyTableBody");
   const yearlyTableBody = document.getElementById("yearlyTableBody");
   const report = document.getElementById("report");
+  const reportNotice = document.getElementById("reportNotice");
   const appTitle = document.getElementById("appTitle");
   const appSubtitle = document.getElementById("appSubtitle");
+  const externalBrowserMessage = "Diese Funktion bitte in Chrome oder Edge öffnen.";
 
   init();
 
@@ -73,6 +75,7 @@
     document.getElementById("shareButton").addEventListener("click", shareReport);
     document.getElementById("exportButton").addEventListener("click", exportCsv);
     document.getElementById("backupButton").addEventListener("click", exportBackup);
+    document.getElementById("importButton").addEventListener("click", openBackupPicker);
     document.getElementById("importInput").addEventListener("change", importBackup);
     document.getElementById("openWeekFromMonthButton").addEventListener("click", () => showView("entryView"));
 
@@ -207,6 +210,26 @@
     render();
   }
 
+  function showReportNotice(message) {
+    reportNotice.textContent = message;
+    reportNotice.hidden = false;
+  }
+
+  function clearReportNotice() {
+    reportNotice.textContent = "";
+    reportNotice.hidden = true;
+  }
+
+  function isLikelyEmbeddedBrowser() {
+    const userAgent = navigator.userAgent || "";
+    return /Electron|VSCode|Codex|wv\)/i.test(userAgent);
+  }
+
+  function showExternalBrowserHint(actionText) {
+    const prefix = actionText ? `${actionText}: ` : "";
+    showReportNotice(`${prefix}${externalBrowserMessage}`);
+  }
+
   function loadState() {
     try {
       const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
@@ -319,8 +342,10 @@
 
   function ensureWeek(year, week) {
     const key = periodKey(year, week);
+    let changed = false;
     if (!state.weeks[key]) {
       state.weeks[key] = { days: {} };
+      changed = true;
     }
 
     const dates = getWeekDates(year, week);
@@ -339,9 +364,12 @@
           })),
           remark: ""
         };
+        changed = true;
       }
     });
-    saveState();
+    if (changed) {
+      saveState();
+    }
   }
 
   function render() {
@@ -734,6 +762,7 @@
   }
 
   function shareReport() {
+    clearReportNotice();
     showView("reportView");
     const reportTitle = `Wochenrapport ${getDisplayName() || "Arbeitsstunden"} ${selectedPeriod.year} KW ${selectedPeriod.week}`;
     const shareData = {
@@ -743,9 +772,12 @@
     };
 
     if (typeof navigator.share === "function") {
-      navigator.share(shareData).catch((error) => {
+      navigator.share(shareData).then(() => {
+        clearReportNotice();
+      }).catch((error) => {
         if (error && error.name !== "AbortError") {
           console.warn("Teilen fehlgeschlagen.", error);
+          showExternalBrowserHint("Teilen fehlgeschlagen");
         }
       });
       return;
@@ -754,14 +786,14 @@
     const fallbackText = `${reportTitle}\n${window.location.href}`;
     if (navigator.clipboard && navigator.clipboard.writeText) {
       navigator.clipboard.writeText(fallbackText).then(() => {
-        window.alert("Rapport-Text wurde in die Zwischenablage kopiert.");
+        showReportNotice("Rapport-Text wurde in die Zwischenablage kopiert.");
       }).catch(() => {
-        window.alert("Teilen wird auf diesem GerÃ¤t nicht unterstÃ¼tzt.");
+        showExternalBrowserHint("Teilen wird hier nicht unterstützt");
       });
       return;
     }
 
-    window.alert("Teilen wird auf diesem GerÃ¤t nicht unterstÃ¼tzt.");
+    showExternalBrowserHint("Teilen wird hier nicht unterstützt");
   }
 
   function renderReport() {
@@ -829,6 +861,7 @@
   }
 
   function exportCsv() {
+    clearReportNotice();
     const rows = [[
       "Datum",
       "Wochentag",
@@ -861,18 +894,16 @@
     });
 
     const csv = rows.map((row) => row.map(csvCell).join(";")).join("\r\n");
-    const blob = new Blob(["\ufeff", csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `stundenrapport-${sanitizeFilename(getDisplayName() || "arbeitsstunden")}-${selectedPeriod.year}-kw${selectedPeriod.week}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+    downloadFile(
+      `stundenrapport-${sanitizeFilename(getDisplayName() || "arbeitsstunden")}-${selectedPeriod.year}-kw${selectedPeriod.week}.csv`,
+      "\ufeff" + csv,
+      "text/csv;charset=utf-8",
+      "CSV-Export"
+    );
   }
 
   function exportBackup() {
+    clearReportNotice();
     const backup = {
       app: "Arbeitsstunden",
       version: 1,
@@ -882,11 +913,26 @@
     downloadFile(
       `arbeitsstunden-backup-${getDateKey(new Date())}.json`,
       JSON.stringify(backup, null, 2),
-      "application/json;charset=utf-8"
+      "application/json;charset=utf-8",
+      "Backup speichern"
     );
   }
 
+  function openBackupPicker() {
+    clearReportNotice();
+    try {
+      document.getElementById("importInput").click();
+      if (isLikelyEmbeddedBrowser()) {
+        showExternalBrowserHint("Falls keine Dateiauswahl erscheint");
+      }
+    } catch (error) {
+      console.warn("Dateiauswahl konnte nicht geöffnet werden.", error);
+      showExternalBrowserHint("Backup laden fehlgeschlagen");
+    }
+  }
+
   function importBackup(event) {
+    clearReportNotice();
     const file = event.target.files && event.target.files[0];
     if (!file) {
       return;
@@ -910,8 +956,9 @@
         saveState();
         ensureWeek(selectedPeriod.year, selectedPeriod.week);
         render();
+        showReportNotice("Backup wurde geladen.");
       } catch (error) {
-        window.alert("Backup konnte nicht geladen werden.");
+        showReportNotice("Backup konnte nicht geladen werden.");
         console.error(error);
       } finally {
         event.target.value = "";
@@ -920,19 +967,37 @@
     reader.readAsText(file);
   }
 
-  function downloadFile(filename, content, type) {
-    const blob = new Blob([content], { type });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = filename;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
+  function downloadFile(filename, content, type, actionText) {
+    if (!("download" in HTMLAnchorElement.prototype)) {
+      showExternalBrowserHint(`${actionText} nicht unterstützt`);
+      return;
+    }
+
+    let url = "";
+    try {
+      const blob = new Blob([content], { type });
+      url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      link.rel = "noopener";
+      link.style.display = "none";
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      showReportNotice(`${actionText} wurde gestartet. Falls kein Download erscheint: ${externalBrowserMessage}`);
+    } catch (error) {
+      console.warn(`${actionText} fehlgeschlagen.`, error);
+      showExternalBrowserHint(`${actionText} fehlgeschlagen`);
+    } finally {
+      if (url) {
+        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+      }
+    }
   }
 
   function getOrderedDays(year, week) {
+    ensureWeek(year, week);
     const days = state.weeks[periodKey(year, week)].days;
     return getWeekDates(year, week).map((date) => days[getDateKey(date)]);
   }
@@ -1373,14 +1438,29 @@
   }
 
   function triggerPrint() {
+    clearReportNotice();
     showView("reportView");
+    if (typeof window.print !== "function") {
+      showExternalBrowserHint("Drucken / PDF wird hier nicht unterstützt");
+      return;
+    }
+
     const originalTitle = document.title;
     document.title = buildPdfFilename();
     window.setTimeout(() => {
-      window.print();
-      window.setTimeout(() => {
-        document.title = originalTitle;
-      }, 300);
+      try {
+        window.print();
+        if (isLikelyEmbeddedBrowser()) {
+          showExternalBrowserHint("Falls kein Druckdialog erscheint");
+        }
+      } catch (error) {
+        console.warn("Drucken / PDF fehlgeschlagen.", error);
+        showExternalBrowserHint("Drucken / PDF fehlgeschlagen");
+      } finally {
+        window.setTimeout(() => {
+          document.title = originalTitle;
+        }, 300);
+      }
     }, 120);
   }
 })();
