@@ -515,64 +515,64 @@
     const input = document.createElement("input");
     input.type = "text";
     input.inputMode = "numeric";
-    input.maxLength = 5;
-    input.placeholder = "HH:MM";
+    input.placeholder = "0730";
     input.autocomplete = "off";
+    input.autocorrect = "off";
+    input.setAttribute("autocorrect", "off");
+    input.spellcheck = false;
     input.disabled = isReadOnly;
     input.className = "time-input";
+    input.value = initialValue || "";
 
-    let lastCommittedValue = initialValue || "";
-    input.value = formatTimeValue(initialValue || "");
+    const message = document.createElement("span");
+    message.className = "time-error";
+    message.hidden = true;
 
-    const updateVisualState = (value) => {
-      const parsed = parseTimeInput(value);
-      input.classList.toggle("invalid", Boolean(parsed.error));
-      input.setAttribute("aria-invalid", parsed.error ? "true" : "false");
-      input.title = parsed.error || "";
-      input.value = parsed.display;
-      if (parsed.error && !parsed.complete) {
-        input.classList.add("invalid");
-      }
+    const showTimeError = (show) => {
+      input.classList.toggle("invalid", show);
+      input.setAttribute("aria-invalid", show ? "true" : "false");
+      message.hidden = !show;
+      message.textContent = show ? "Bitte Uhrzeit als 0730 oder 07:30 eingeben" : "";
     };
 
-    input.addEventListener("focus", () => {
-      if (input.value) {
-        input.setSelectionRange(0, input.value.length);
-      }
-    });
-
     input.addEventListener("input", () => {
-      const parsed = parseTimeInput(input.value);
-      updateVisualState(parsed.rawValue);
-      if (parsed.valid && parsed.complete) {
-        lastCommittedValue = parsed.value;
-        updateEntry(dayKey, entryIndex, field, parsed.value);
-      }
+      showTimeError(false);
     });
 
-    input.addEventListener("blur", () => {
-      const parsed = finalizeTimeInput(input.value, lastCommittedValue);
-      if (!parsed.rawValue) {
-        lastCommittedValue = "";
+    const commitTimeInput = () => {
+      const parsed = parseTimeInput(input.value);
+      if (parsed.empty) {
         input.value = "";
+        showTimeError(false);
         updateEntry(dayKey, entryIndex, field, "");
-        updateVisualState(input.value);
         return;
       }
-      const nextValue = parsed.value || lastCommittedValue || "";
-      input.value = nextValue ? formatTimeValue(nextValue) : "";
-      if (nextValue) {
-        updateEntry(dayKey, entryIndex, field, nextValue);
+      if (parsed.valid) {
+        input.value = parsed.value;
+        showTimeError(false);
+        updateEntry(dayKey, entryIndex, field, parsed.value);
+        return;
       }
-      updateVisualState(input.value);
-    });
+      showTimeError(true);
+      updateEntry(dayKey, entryIndex, field, "");
+    };
 
-    return input;
+    input.addEventListener("blur", commitTimeInput);
+    input.addEventListener("change", commitTimeInput);
+
+    const wrapper = document.createElement("span");
+    wrapper.className = "time-field";
+    wrapper.append(input, message);
+    return wrapper;
   }
 
   function updateEntry(dayKey, entryIndex, field, value) {
     const day = state.weeks[periodKey(selectedPeriod.year, selectedPeriod.week)].days[dayKey];
-    day.entries[entryIndex][field] = value;
+    const entry = day.entries[entryIndex];
+    if (entry[field] === value) {
+      return;
+    }
+    entry[field] = value;
     saveState();
     window.requestAnimationFrame(() => {
       renderDashboard();
@@ -1247,120 +1247,64 @@
   }
 
   function timeToMinutes(value) {
-    const normalized = formatTimeValue(value);
-    if (!normalized) {
+    const parsed = parseTimeInput(value);
+    if (!parsed.valid) {
       return 0;
     }
-    const [hours, minutes] = normalized.split(":").map(Number);
+    const [hours, minutes] = parsed.value.split(":").map(Number);
     if (!Number.isFinite(hours) || !Number.isFinite(minutes)) {
       return 0;
     }
     return hours * 60 + minutes;
   }
 
-  function formatTimeValue(value) {
-    const parsed = parseTimeInput(value);
-    return parsed.display;
-  }
-
   function parseTimeInput(value) {
     const rawValue = String(value || "").trim();
     if (!rawValue) {
-      return { rawValue, display: "", value: "", valid: false, complete: false, error: "" };
+      return { rawValue, value: "", valid: false, empty: true, error: "" };
     }
 
-    const sanitized = rawValue.replace(/[^\d:]/g, "");
-    if (!sanitized) {
-      return { rawValue, display: "", value: "", valid: false, complete: false, error: "" };
+    const colonMatch = rawValue.match(/^(\d{1,2}):(\d{2})$/);
+    if (colonMatch) {
+      return parseTimeParts(colonMatch[1], colonMatch[2], rawValue);
     }
 
-    if (sanitized.includes(":")) {
-      const [hoursPart, minutesPart] = sanitized.split(":", 2);
-      const hours = String(hoursPart || "").replace(/\D/g, "");
-      const minutes = String(minutesPart || "").replace(/\D/g, "");
-      if (!hours || !minutes) {
-        return { rawValue, display: sanitized, value: "", valid: false, complete: false, error: "" };
+    const digitMatch = rawValue.match(/^\d{3,4}$/);
+    if (digitMatch) {
+      const digits = rawValue;
+      if (digits.length === 3) {
+        return parseTimeParts(digits.slice(0, 1), digits.slice(1), rawValue);
       }
-      return parseTimeParts(hours, minutes, sanitized);
+      return parseTimeParts(digits.slice(0, 2), digits.slice(2), rawValue);
     }
 
-    const digits = sanitized.replace(/:/g, "");
-    if (digits.length <= 2) {
-      return { rawValue, display: digits, value: "", valid: false, complete: false, error: "" };
-    }
-    if (digits.length === 3) {
-      const hours = digits.slice(0, 1).padStart(2, "0");
-      const minutes = digits.slice(1, 3).padStart(2, "0");
-      const parsed = parseTimeParts(hours, minutes, `${hours}:${minutes}`);
-      if (parsed.valid) {
-        return parsed;
-      }
-      return { rawValue, display: digits, value: "", valid: false, complete: false, error: "" };
-    }
-    if (digits.length >= 4) {
-      const hours = digits.slice(0, 2);
-      const minutes = digits.slice(2, 4);
-      return parseTimeParts(hours, minutes, `${hours}:${minutes}`);
-    }
-    return { rawValue, display: digits, value: "", valid: false, complete: false, error: "" };
+    return invalidTime(rawValue);
   }
 
-  function parseTimeParts(hours, minutes, displayValue) {
+  function parseTimeParts(hours, minutes, rawValue) {
     const paddedHours = String(hours).padStart(2, "0");
-    const paddedMinutes = String(minutes).padStart(2, "0");
+    const paddedMinutes = String(minutes);
     const valid = /^([01]\d|2[0-3]):([0-5]\d)$/.test(`${paddedHours}:${paddedMinutes}`);
     if (!valid) {
-      return {
-        rawValue: displayValue,
-        display: displayValue,
-        value: "",
-        valid: false,
-        complete: true,
-        error: "Bitte eine Uhrzeit zwischen 00:00 und 23:59 eingeben."
-      };
+      return invalidTime(rawValue);
     }
     return {
-      rawValue: displayValue,
-      display: `${paddedHours}:${paddedMinutes}`,
+      rawValue,
       value: `${paddedHours}:${paddedMinutes}`,
       valid: true,
-      complete: true,
+      empty: false,
       error: ""
     };
   }
 
-  function finalizeTimeInput(value, fallbackValue) {
-    const parsed = parseTimeInput(value);
-    if (parsed.valid && parsed.complete) {
-      return parsed;
-    }
-    if (!parsed.display) {
-      return { rawValue: value, display: "", value: "", valid: false, complete: false, error: "" };
-    }
-
-    const digits = String(parsed.display || "").replace(/:/g, "");
-    if (digits.length === 1) {
-      const hours = digits.padStart(2, "0");
-      return parseTimeParts(hours, "00", `${hours}:00`);
-    }
-    if (digits.length === 2) {
-      const hours = digits.padStart(2, "0");
-      return parseTimeParts(hours, "00", `${hours}:00`);
-    }
-    if (digits.length === 3) {
-      const hours = digits.slice(0, 1).padStart(2, "0");
-      const minutes = digits.slice(1, 3).padStart(2, "0");
-      const parsed = parseTimeParts(hours, minutes, `${hours}:${minutes}`);
-      if (parsed.valid) {
-        return parsed;
-      }
-      return { rawValue: value, display: digits, value: "", valid: false, complete: false, error: "" };
-    }
-
-    if (fallbackValue) {
-      return parseTimeInput(fallbackValue);
-    }
-    return { rawValue: value, display: "", value: "", valid: false, complete: false, error: "" };
+  function invalidTime(rawValue) {
+    return {
+      rawValue,
+      value: "",
+      valid: false,
+      empty: false,
+      error: "Bitte Uhrzeit als 0730 oder 07:30 eingeben"
+    };
   }
 
   function setBalanceClass(element, value) {

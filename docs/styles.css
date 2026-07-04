@@ -84,7 +84,6 @@ h1 {
 }
 
 select,
-input[type="time"],
 input[type="date"],
 input[type="number"],
 input[type="text"],
@@ -96,10 +95,6 @@ textarea {
   background: #fff;
   color: var(--ink);
   padding: 10px 12px;
-}
-
-input[type="time"] {
-  min-width: 128px;
 }
 
 select:focus,
@@ -506,10 +501,22 @@ button:active {
   font-variant-numeric: tabular-nums;
 }
 
+.time-field {
+  display: grid;
+  gap: 4px;
+}
+
 .time-input.invalid {
   border-color: #b83a36;
   background: #fff6f5;
   color: #b83a36;
+}
+
+.time-error {
+  color: #b83a36;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.2;
 }
 
 .remarks {
@@ -683,9 +690,6 @@ textarea {
     grid-template-columns: 1fr;
   }
 
-  input[type="time"] {
-    min-width: 0;
-  }
 }
 
 @media print {
