@@ -552,6 +552,13 @@
 
     input.addEventListener("blur", () => {
       const parsed = finalizeTimeInput(input.value, lastCommittedValue);
+      if (!parsed.rawValue) {
+        lastCommittedValue = "";
+        input.value = "";
+        updateEntry(dayKey, entryIndex, field, "");
+        updateVisualState(input.value);
+        return;
+      }
       const nextValue = parsed.value || lastCommittedValue || "";
       input.value = nextValue ? formatTimeValue(nextValue) : "";
       if (nextValue) {
@@ -756,6 +763,10 @@
         <article class="summary-card">
           <span>Plus / Minus</span>
           <strong>${formatSignedHours(totalBalance)}</strong>
+        </article>
+        <article class="summary-card">
+          <span>Übertrag gesamt</span>
+          <strong>${formatSignedHours(yearCarry)}</strong>
         </article>
       `;
     }
@@ -1431,10 +1442,7 @@
 
   function buildPdfFilename() {
     const weekText = String(selectedPeriod.week).padStart(2, "0");
-    const baseName = getDisplayName()
-      ? `Rapport_${sanitizeFilename(getDisplayName())}_KW${weekText}_${selectedPeriod.year}`
-      : `Rapport_KW${weekText}_${selectedPeriod.year}`;
-    return `${baseName}.pdf`;
+    return `Rapport_KW${weekText}_${selectedPeriod.year}.pdf`;
   }
 
   function triggerPrint() {
