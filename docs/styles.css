@@ -233,6 +233,11 @@ button {
   cursor: pointer;
 }
 
+.actions button,
+.actions .import-button {
+  white-space: nowrap;
+}
+
 .import-button {
   display: inline-flex;
   align-items: center;
@@ -346,6 +351,80 @@ button:active {
   color: var(--green);
 }
 
+.day-card.vacation {
+  border-color: #89b8e7;
+  background: linear-gradient(135deg, #f3f8ff 0%, #eef5ff 100%);
+}
+
+.day-card.illness {
+  border-color: #f0b36b;
+  background: linear-gradient(135deg, #fff7ec 0%, #fff2e0 100%);
+}
+
+.day-card.free {
+  border-color: #c8cfc8;
+  background: #f4f5f4;
+}
+
+.day-card.holiday {
+  border-color: #b39ddb;
+  background: linear-gradient(135deg, #f6f2ff 0%, #efe8ff 100%);
+}
+
+.day-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+}
+
+.day-type-field {
+  display: grid;
+  gap: 6px;
+  min-width: 180px;
+}
+
+.day-type-field span {
+  color: var(--muted);
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.day-type-select {
+  min-height: 46px;
+}
+
+.holiday-button {
+  min-height: 46px;
+  background: #f2e8ff;
+  color: #5a3ea0;
+}
+
+.holiday-button.active {
+  background: #5a3ea0;
+  color: #fff;
+}
+
+.day-status-pill,
+.day-target-pill {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0 12px;
+  border-radius: 999px;
+  background: #eef3ef;
+  color: var(--ink);
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.entries.disabled {
+  opacity: 0.6;
+}
+
 .day-head {
   display: flex;
   align-items: center;
@@ -407,6 +486,16 @@ button:active {
   justify-self: end;
   color: var(--muted);
   font-weight: 900;
+}
+
+.time-input {
+  font-variant-numeric: tabular-nums;
+}
+
+.time-input.invalid {
+  border-color: #b83a36;
+  background: #fff6f5;
+  color: #b83a36;
 }
 
 .remarks {
@@ -492,6 +581,10 @@ textarea {
   background: #f7f9f7;
   border: 1px solid var(--line);
   border-radius: 8px;
+}
+
+.report-table td:nth-child(4) {
+  min-width: 240px;
 }
 
 .report-summary span {
@@ -585,6 +678,10 @@ textarea {
   body {
     background: #fff;
     font-size: 12px;
+  }
+
+  .actions {
+    display: none !important;
   }
 
   .app-header,
