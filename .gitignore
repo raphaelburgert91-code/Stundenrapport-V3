@@ -1,5 +1,9 @@
 .agents/
 .codex/
+node_modules/
+dist/
+.vscode/
+.env
 *.log
-Thumbs.db
 .DS_Store
+Thumbs.db

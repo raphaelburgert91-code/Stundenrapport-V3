@@ -38,6 +38,18 @@ docs/
 
 Nach dem ersten Öffnen funktioniert die App offline. Die Arbeitsstunden werden lokal auf dem Tablet gespeichert.
 
+## Projektstruktur
+
+Die Projektvorlagen aus dem Template-Ordner wurden in die folgenden Bereiche übernommen:
+
+- `src/` für Quellcode und Erweiterungen
+- `data/` für Daten- und Konfigurationsdateien
+- `assets/` für Bild- und Icon-Ressourcen
+- `export/` für Exportdateien
+- `tests/` für Testfälle
+- `scripts/` für Hilfsskripte
+- `reference/` für Referenzmaterial
+
 ## Datensicherung
 
 - `Daten exportieren` erstellt eine CSV-Datei.
