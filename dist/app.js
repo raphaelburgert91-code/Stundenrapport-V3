@@ -790,7 +790,6 @@
       <div class="report-header">
         <div>
           <h2>Wochenrapport</h2>
-          <strong>${getDisplayName() || "Name"}</strong>
         </div>
         <div>
           <strong>${selectedPeriod.year} - KW ${selectedPeriod.week}</strong><br>
@@ -846,7 +845,6 @@
       <div class="report-header">
         <div>
           <h2>Monatsrapport</h2>
-          <strong>${getDisplayName() || "Name"}</strong>
         </div>
         <div>
           <strong>${String(month).padStart(2, "0")}/${year}</strong>
@@ -899,7 +897,6 @@
       <div class="report-header">
         <div>
           <h2>Jahresrapport</h2>
-          <strong>${getDisplayName() || "Name"}</strong>
         </div>
         <div>
           <strong>${year}</strong>
