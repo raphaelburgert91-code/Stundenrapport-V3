@@ -190,14 +190,15 @@
 
       <section id="reportView" class="view" aria-label="Rapport">
         <div class="actions no-print">
-          <button id="previewButton" type="button">Rapport anzeigen</button>
+          <label class="report-type-field">
+            <span>Rapport</span>
+            <select id="reportTypeSelect" aria-label="Rapport auswählen">
+              <option value="week">Woche</option>
+              <option value="month">Monat</option>
+              <option value="year">Jahr</option>
+            </select>
+          </label>
           <button id="printButton" class="primary" type="button">Drucken / PDF</button>
-          <button id="savePdfButton" type="button">Als PDF speichern</button>
-          <button id="shareButton" type="button">Teilen</button>
-          <button id="exportButton" type="button">Daten exportieren</button>
-          <button id="backupButton" type="button">Backup speichern</button>
-          <button id="importButton" type="button">Backup laden</button>
-          <input id="importInput" class="file-input" type="file" accept="application/json,.json">
         </div>
         <p id="reportNotice" class="report-notice" role="status" aria-live="polite" hidden></p>
         <article id="report" class="report"></article>

@@ -217,6 +217,14 @@ main {
   margin-bottom: 16px;
 }
 
+.report-type-field {
+  display: grid;
+  gap: 6px;
+  min-width: 180px;
+  color: var(--muted);
+  font-weight: 800;
+}
+
 button {
   min-height: 56px;
   border: 0;
@@ -228,8 +236,7 @@ button {
   cursor: pointer;
 }
 
-.actions button,
-.actions .import-button {
+.actions button {
   white-space: nowrap;
 }
 
@@ -710,7 +717,7 @@ textarea {
   .dashboard,
   .tabbar,
   .no-print,
-  #entryView {
+  .view {
     display: none !important;
   }
 
@@ -718,8 +725,7 @@ textarea {
     padding: 0;
   }
 
-  #reportView,
-  .view {
+  #reportView {
     display: block !important;
   }
 
@@ -733,5 +739,19 @@ textarea {
   .report-table th,
   .report-table td {
     padding: 5px;
+    vertical-align: top;
+  }
+
+  .report-summary {
+    grid-template-columns: repeat(3, 1fr);
+    gap: 8px;
+  }
+
+  .report-summary div {
+    padding: 8px 10px;
+  }
+
+  @page {
+    margin: 12mm;
   }
 }

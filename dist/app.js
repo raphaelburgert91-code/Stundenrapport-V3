@@ -16,7 +16,7 @@
   const categories = [
     "Gruppe vormittags",
     "Gruppe nachmittags",
-    "PÃ¤dagogische Vor-/Nachbereitung",
+    "Pädagogische Vor-/Nachbereitung",
     "Dienstbeginn/Entlassen/Raum richten",
     "Elternarbeit",
     "Dienstbesprechung"
@@ -53,6 +53,7 @@
   const yearlyTableBody = document.getElementById("yearlyTableBody");
   const report = document.getElementById("report");
   const reportNotice = document.getElementById("reportNotice");
+  const reportTypeSelect = document.getElementById("reportTypeSelect");
   const appTitle = document.getElementById("appTitle");
   const appSubtitle = document.getElementById("appSubtitle");
   const externalBrowserMessage = "Diese Funktion bitte in Chrome oder Edge öffnen.";
@@ -63,20 +64,10 @@
     buildWeekOptions();
     buildYearOptions();
     bindTabs();
-    document.getElementById("previewButton").addEventListener("click", () => {
-      showView("reportView");
-    });
     document.getElementById("printButton").addEventListener("click", () => {
       triggerPrint();
     });
-    document.getElementById("savePdfButton").addEventListener("click", () => {
-      triggerPrint();
-    });
-    document.getElementById("shareButton").addEventListener("click", shareReport);
-    document.getElementById("exportButton").addEventListener("click", exportCsv);
-    document.getElementById("backupButton").addEventListener("click", exportBackup);
-    document.getElementById("importButton").addEventListener("click", openBackupPicker);
-    document.getElementById("importInput").addEventListener("change", importBackup);
+    reportTypeSelect.addEventListener("change", renderReport);
     document.getElementById("openWeekFromMonthButton").addEventListener("click", () => showView("entryView"));
 
     nameInput.addEventListener("input", () => {
@@ -268,7 +259,7 @@
           : DEFAULT_START_CARRY,
         region: typeof savedState.settings?.region === "string" && savedState.settings.region
           ? savedState.settings.region
-          : "Baden-WÃ¼rttemberg",
+          : "Baden-Württemberg",
         year: Number.isFinite(savedState.settings?.year)
           ? savedState.settings.year
           : new Date().getFullYear()
@@ -515,7 +506,7 @@
     const input = document.createElement("input");
     input.type = "text";
     input.inputMode = "numeric";
-    input.placeholder = "0730";
+    input.placeholder = "";
     input.autocomplete = "off";
     input.autocorrect = "off";
     input.setAttribute("autocorrect", "off");
@@ -647,7 +638,7 @@
         <strong>${formatSignedHours(balance)}</strong>
       </article>
       <article class="summary-card">
-        <span>Ãœbertrag</span>
+        <span>Übertrag</span>
         <strong>${formatSignedHours(carry)}</strong>
       </article>
     `;
@@ -772,42 +763,20 @@
     }
   }
 
-  function shareReport() {
-    clearReportNotice();
-    showView("reportView");
-    const reportTitle = `Wochenrapport ${getDisplayName() || "Arbeitsstunden"} ${selectedPeriod.year} KW ${selectedPeriod.week}`;
-    const shareData = {
-      title: reportTitle,
-      text: reportTitle,
-      url: window.location.href
-    };
-
-    if (typeof navigator.share === "function") {
-      navigator.share(shareData).then(() => {
-        clearReportNotice();
-      }).catch((error) => {
-        if (error && error.name !== "AbortError") {
-          console.warn("Teilen fehlgeschlagen.", error);
-          showExternalBrowserHint("Teilen fehlgeschlagen");
-        }
-      });
+  function renderReport() {
+    const reportType = getReportType();
+    if (reportType === "month") {
+      renderMonthReport();
       return;
     }
-
-    const fallbackText = `${reportTitle}\n${window.location.href}`;
-    if (navigator.clipboard && navigator.clipboard.writeText) {
-      navigator.clipboard.writeText(fallbackText).then(() => {
-        showReportNotice("Rapport-Text wurde in die Zwischenablage kopiert.");
-      }).catch(() => {
-        showExternalBrowserHint("Teilen wird hier nicht unterstützt");
-      });
+    if (reportType === "year") {
+      renderYearReport();
       return;
     }
-
-    showExternalBrowserHint("Teilen wird hier nicht unterstützt");
+    renderWeekReport();
   }
 
-  function renderReport() {
+  function renderWeekReport() {
     const dates = getWeekDates(selectedPeriod.year, selectedPeriod.week);
     const days = getOrderedDays(selectedPeriod.year, selectedPeriod.week);
     const rows = days.map((day) => reportDayRow(day));
@@ -845,8 +814,123 @@
         <div><span>Wochensumme</span><strong>${formatHours(total)}</strong></div>
         <div><span>Sollstunden</span><strong>${formatHours(target)}</strong></div>
         <div><span>Plus / Minus</span><strong>${formatSignedHours(balance)}</strong></div>
-        <div><span>Start-Ãœbertrag</span><strong>${formatSignedHours(getStartCarry())}</strong></div>
-        <div><span>Ãœbertrag gesamt</span><strong>${formatSignedHours(carry)}</strong></div>
+        <div><span>Start-Übertrag</span><strong>${formatSignedHours(getStartCarry())}</strong></div>
+        <div><span>Übertrag gesamt</span><strong>${formatSignedHours(carry)}</strong></div>
+      </div>
+    `;
+  }
+
+  function renderMonthReport() {
+    const selected = getSelectedDateObject();
+    const year = selected.getFullYear();
+    const month = selected.getMonth() + 1;
+    const stats = getMonthStats(year, month);
+    const rows = stats.periods.map((period) => {
+      const dates = getWeekDates(period.year, period.week);
+      const weekTotalValue = getWeekTotal(period.year, period.week);
+      const weekTargetValue = getWeekTarget(period.year, period.week);
+      const weekBalanceValue = roundHours(weekTotalValue - weekTargetValue);
+      const weekCarry = getCarryAfterWeek(period.year, period.week);
+      return `
+        <tr>
+          <td>${period.year} - KW ${period.week}</td>
+          <td>${formatShortDate(dates[0])} - ${formatShortDate(dates[4])}</td>
+          <td>${formatHours(weekTotalValue)}</td>
+          <td>${formatHours(weekTargetValue)}</td>
+          <td>${formatSignedHours(weekBalanceValue)}</td>
+          <td>${formatSignedHours(weekCarry)}</td>
+        </tr>`;
+    }).join("");
+
+    report.innerHTML = `
+      <div class="report-header">
+        <div>
+          <h2>Monatsrapport</h2>
+          <strong>${getDisplayName() || "Name"}</strong>
+        </div>
+        <div>
+          <strong>${String(month).padStart(2, "0")}/${year}</strong>
+        </div>
+      </div>
+      <table class="report-table report-table-compact">
+        <thead>
+          <tr>
+            <th>Woche</th>
+            <th>Zeitraum</th>
+            <th>Ist</th>
+            <th>Soll</th>
+            <th>Plus / Minus</th>
+            <th>Übertrag</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="report-summary">
+        <div><span>Arbeitstage</span><strong>${stats.summary.workday}</strong></div>
+        <div><span>Urlaubstage</span><strong>${stats.summary.vacation}</strong></div>
+        <div><span>Krankheitstage</span><strong>${stats.summary.illness}</strong></div>
+        <div><span>Feiertage</span><strong>${stats.summary.holiday}</strong></div>
+        <div><span>Freie Tage</span><strong>${stats.summary.free}</strong></div>
+        <div><span>Ist-Stunden</span><strong>${formatHours(stats.total)}</strong></div>
+        <div><span>Sollstunden</span><strong>${formatHours(stats.target)}</strong></div>
+        <div><span>Plus / Minus</span><strong>${formatSignedHours(stats.balance)}</strong></div>
+        <div><span>Übertrag gesamt</span><strong>${formatSignedHours(stats.carry)}</strong></div>
+      </div>
+    `;
+  }
+
+  function renderYearReport() {
+    const year = getSelectedDateObject().getFullYear();
+    const stats = getYearStats(year);
+    const rows = stats.months.map((monthStats) => `
+      <tr>
+        <td>${String(monthStats.month).padStart(2, "0")}/${year}</td>
+        <td>${monthStats.summary.workday}</td>
+        <td>${monthStats.summary.vacation}</td>
+        <td>${monthStats.summary.illness}</td>
+        <td>${monthStats.summary.holiday}</td>
+        <td>${monthStats.summary.free}</td>
+        <td>${formatHours(monthStats.total)}</td>
+        <td>${formatHours(monthStats.target)}</td>
+        <td>${formatSignedHours(monthStats.balance)}</td>
+      </tr>`).join("");
+
+    report.innerHTML = `
+      <div class="report-header">
+        <div>
+          <h2>Jahresrapport</h2>
+          <strong>${getDisplayName() || "Name"}</strong>
+        </div>
+        <div>
+          <strong>${year}</strong>
+        </div>
+      </div>
+      <table class="report-table report-table-compact">
+        <thead>
+          <tr>
+            <th>Monat</th>
+            <th>Arbeit</th>
+            <th>Urlaub</th>
+            <th>Krank</th>
+            <th>Feiertag</th>
+            <th>Frei</th>
+            <th>Ist</th>
+            <th>Soll</th>
+            <th>Plus / Minus</th>
+          </tr>
+        </thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <div class="report-summary">
+        <div><span>Arbeitstage</span><strong>${stats.summary.workday}</strong></div>
+        <div><span>Urlaubstage</span><strong>${stats.summary.vacation}</strong></div>
+        <div><span>Krankheitstage</span><strong>${stats.summary.illness}</strong></div>
+        <div><span>Feiertage</span><strong>${stats.summary.holiday}</strong></div>
+        <div><span>Freie Tage</span><strong>${stats.summary.free}</strong></div>
+        <div><span>Ist-Stunden</span><strong>${formatHours(stats.total)}</strong></div>
+        <div><span>Sollstunden</span><strong>${formatHours(stats.target)}</strong></div>
+        <div><span>Plus / Minus</span><strong>${formatSignedHours(stats.balance)}</strong></div>
+        <div><span>Übertrag gesamt</span><strong>${formatSignedHours(stats.carry)}</strong></div>
       </div>
     `;
   }
@@ -855,12 +939,12 @@
     const date = new Date(`${day.date}T00:00:00`);
     const dayType = getDayTypeLabel(day);
     const holidayDate = isHoliday(date);
-    const dayLabel = holidayDate ? `${dayType} Â· Feiertag` : dayType;
+    const dayLabel = holidayDate ? `${dayType} - Feiertag` : dayType;
     const timeEntries = day.entries
       .filter((entry) => entry.from || entry.to)
       .map((entry) => `${entry.category}: ${entry.from || "-"} - ${entry.to || "-"}`);
-    const timesText = timeEntries.length > 0 ? timeEntries.join("<br>") : "â€”";
-    const remark = day.remark ? escapeHtml(day.remark) : "â€”";
+    const timesText = timeEntries.length > 0 ? timeEntries.join("<br>") : "";
+    const remark = day.remark ? escapeHtml(day.remark) : "";
     return `<tr>
       <td>${escapeHtml(formatDate(date))}</td>
       <td>${escapeHtml(day.weekday)}</td>
@@ -871,140 +955,37 @@
     </tr>`;
   }
 
-  function exportCsv() {
-    clearReportNotice();
-    const rows = [[
-      "Datum",
-      "Wochentag",
-      "Kalenderwoche",
-      "Kategorie",
-      "Von-Zeit",
-      "Bis-Zeit",
-      "Dauer",
-      "Bemerkung"
-    ]];
-
-    forEachPeriod((year, week) => {
-      ensureWeek(year, week);
-      getOrderedDays(year, week).forEach((day) => {
-        day.entries.forEach((entry) => {
-          if (entry.from || entry.to || day.remark) {
-            rows.push([
-              day.date,
-              day.weekday,
-              `${year} KW ${week}`,
-              entry.category,
-              entry.from,
-              entry.to,
-              formatDecimal(getEntryDuration(entry)),
-              day.remark || ""
-            ]);
-          }
-        });
-      });
-    });
-
-    const csv = rows.map((row) => row.map(csvCell).join(";")).join("\r\n");
-    downloadFile(
-      `stundenrapport-${sanitizeFilename(getDisplayName() || "arbeitsstunden")}-${selectedPeriod.year}-kw${selectedPeriod.week}.csv`,
-      "\ufeff" + csv,
-      "text/csv;charset=utf-8",
-      "CSV-Export"
-    );
+  function getReportType() {
+    return reportTypeSelect.value || "week";
   }
 
-  function exportBackup() {
-    clearReportNotice();
-    const backup = {
-      app: "Arbeitsstunden",
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      data: state
-    };
-    downloadFile(
-      `arbeitsstunden-backup-${getDateKey(new Date())}.json`,
-      JSON.stringify(backup, null, 2),
-      "application/json;charset=utf-8",
-      "Backup speichern"
-    );
+  function getMonthStats(year, month) {
+    const periods = getPeriodsForMonth(year, month);
+    const days = periods.flatMap((period) => getOrderedDays(period.year, period.week));
+    const summary = getDayTypeSummary(days);
+    const total = roundHours(periods.reduce((sum, period) => sum + getWeekTotal(period.year, period.week), 0));
+    const target = roundHours(days.reduce((sum, day) => sum + getDayTarget(day), 0));
+    const balance = roundHours(total - target);
+    const lastPeriod = periods[periods.length - 1];
+    const carry = lastPeriod ? getCarryAfterWeek(lastPeriod.year, lastPeriod.week) : getStartCarry();
+    return { year, month, periods, summary, total, target, balance, carry };
   }
 
-  function openBackupPicker() {
-    clearReportNotice();
-    try {
-      document.getElementById("importInput").click();
-      if (isLikelyEmbeddedBrowser()) {
-        showExternalBrowserHint("Falls keine Dateiauswahl erscheint");
-      }
-    } catch (error) {
-      console.warn("Dateiauswahl konnte nicht geöffnet werden.", error);
-      showExternalBrowserHint("Backup laden fehlgeschlagen");
-    }
-  }
-
-  function importBackup(event) {
-    clearReportNotice();
-    const file = event.target.files && event.target.files[0];
-    if (!file) {
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.addEventListener("load", () => {
-      try {
-        const parsed = JSON.parse(String(reader.result || "{}"));
-        const imported = normalizeState(parsed.data || parsed);
-        if (!imported.weeks || typeof imported.weeks !== "object") {
-          throw new Error("Backup enthalt keine Wochen.");
-        }
-        const ok = window.confirm("Backup laden und aktuelle Daten auf diesem GerÃ¤t ersetzen?");
-        if (!ok) {
-          event.target.value = "";
-          return;
-        }
-        state.weeks = imported.weeks;
-        state.settings = imported.settings;
-        saveState();
-        ensureWeek(selectedPeriod.year, selectedPeriod.week);
-        render();
-        showReportNotice("Backup wurde geladen.");
-      } catch (error) {
-        showReportNotice("Backup konnte nicht geladen werden.");
-        console.error(error);
-      } finally {
-        event.target.value = "";
-      }
-    });
-    reader.readAsText(file);
-  }
-
-  function downloadFile(filename, content, type, actionText) {
-    if (!("download" in HTMLAnchorElement.prototype)) {
-      showExternalBrowserHint(`${actionText} nicht unterstützt`);
-      return;
-    }
-
-    let url = "";
-    try {
-      const blob = new Blob([content], { type });
-      url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      link.href = url;
-      link.download = filename;
-      link.rel = "noopener";
-      link.style.display = "none";
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-      showReportNotice(`${actionText} wurde gestartet. Falls kein Download erscheint: ${externalBrowserMessage}`);
-    } catch (error) {
-      console.warn(`${actionText} fehlgeschlagen.`, error);
-      showExternalBrowserHint(`${actionText} fehlgeschlagen`);
-    } finally {
-      if (url) {
-        window.setTimeout(() => URL.revokeObjectURL(url), 1000);
-      }
-    }
+  function getYearStats(year) {
+    const months = Array.from({ length: 12 }, (_, index) => getMonthStats(year, index + 1));
+    const summary = months.reduce((totals, monthStats) => {
+      totals.workday += monthStats.summary.workday;
+      totals.vacation += monthStats.summary.vacation;
+      totals.illness += monthStats.summary.illness;
+      totals.holiday += monthStats.summary.holiday;
+      totals.free += monthStats.summary.free;
+      return totals;
+    }, { workday: 0, vacation: 0, illness: 0, holiday: 0, free: 0 });
+    const total = roundHours(months.reduce((sum, monthStats) => sum + monthStats.total, 0));
+    const target = roundHours(months.reduce((sum, monthStats) => sum + monthStats.target, 0));
+    const balance = roundHours(total - target);
+    const carry = getCarryAfterWeek(year, getWeeksInYear(year));
+    return { year, months, summary, total, target, balance, carry };
   }
 
   function getOrderedDays(year, week) {
@@ -1077,7 +1058,7 @@
   }
 
   function getSettingsRegion() {
-    return typeof state.settings.region === "string" && state.settings.region ? state.settings.region : "Baden-WÃ¼rttemberg";
+    return typeof state.settings.region === "string" && state.settings.region ? state.settings.region : "Baden-Württemberg";
   }
 
   function getDayTypeSummary(days) {
@@ -1372,21 +1353,17 @@
       .replaceAll("'", "&#039;");
   }
 
-  function csvCell(value) {
-    return `"${String(value).replaceAll('"', '""')}"`;
-  }
-
-  function sanitizeFilename(value) {
-    return String(value || "stundenrapport")
-      .normalize("NFKD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-zA-Z0-9._-]+/g, "_")
-      .replace(/^_+|_+$/g, "");
-  }
-
   function buildPdfFilename() {
+    const reportType = getReportType();
     const weekText = String(selectedPeriod.week).padStart(2, "0");
-    return `Rapport_KW${weekText}_${selectedPeriod.year}.pdf`;
+    const selected = getSelectedDateObject();
+    if (reportType === "month") {
+      return `Rapport_Monat_${String(selected.getMonth() + 1).padStart(2, "0")}_${selected.getFullYear()}.pdf`;
+    }
+    if (reportType === "year") {
+      return `Rapport_Jahr_${selected.getFullYear()}.pdf`;
+    }
+    return `Rapport_Woche_KW${weekText}_${selectedPeriod.year}.pdf`;
   }
 
   function triggerPrint() {
