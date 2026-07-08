@@ -38,6 +38,16 @@ docs/
 
 Nach dem ersten Öffnen funktioniert die App offline. Die Arbeitsstunden werden lokal auf dem Tablet gespeichert.
 
+## Datensicherung
+
+Unter `Einstellungen` kann der vollständige lokale Datenbestand als JSON-Backup gespeichert und später wieder geladen werden. Beim Laden werden vorhandene Daten erst nach einer Sicherheitsabfrage überschrieben.
+
+Für Auswertungen steht zusätzlich ein CSV-Export mit einer Zeile pro Buchung zur Verfügung.
+
+## Buchungszeilen
+
+Jeder Arbeitstag enthält mindestens eine freie Buchungszeile. Weitere Zeilen können hinzugefügt und gelöscht werden. Alte Einträge mit festen Kategorien werden beim ersten Laden automatisch in das flexible Format übernommen.
+
 ## Projektstruktur
 
 Die Projektvorlagen aus dem Template-Ordner wurden in die folgenden Bereiche übernommen:

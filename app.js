@@ -12,15 +12,7 @@
   const LAST_DATE_KEY = "stundenrapport-last-date";
   const LAST_VIEW_KEY = "stundenrapport-last-view";
   const OLD_LAST_WEEK_KEY = "stundenrapport-last-week";
-
-  const categories = [
-    "Gruppe vormittags",
-    "Gruppe nachmittags",
-    "Pädagogische Vor-/Nachbereitung",
-    "Dienstbeginn/Entlassen/Raum richten",
-    "Elternarbeit",
-    "Dienstbesprechung"
-  ];
+  const BACKUP_VERSION = 1;
 
   const dayNames = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"];
   const state = loadState();
@@ -54,6 +46,8 @@
   const report = document.getElementById("report");
   const reportNotice = document.getElementById("reportNotice");
   const reportTypeSelect = document.getElementById("reportTypeSelect");
+  const backupFileInput = document.getElementById("backupFileInput");
+  const backupNotice = document.getElementById("backupNotice");
   const appTitle = document.getElementById("appTitle");
   const appSubtitle = document.getElementById("appSubtitle");
   const externalBrowserMessage = "Diese Funktion bitte in Chrome oder Edge öffnen.";
@@ -68,6 +62,10 @@
       triggerPrint();
     });
     reportTypeSelect.addEventListener("change", renderReport);
+    document.getElementById("backupSaveButton").addEventListener("click", saveBackup);
+    document.getElementById("backupLoadButton").addEventListener("click", () => backupFileInput.click());
+    document.getElementById("csvExportButton").addEventListener("click", exportCsv);
+    backupFileInput.addEventListener("change", loadBackup);
     document.getElementById("openWeekFromMonthButton").addEventListener("click", () => showView("entryView"));
 
     nameInput.addEventListener("input", () => {
@@ -248,7 +246,7 @@
 
   function normalizeState(savedState) {
     return {
-      weeks: savedState.weeks || {},
+      weeks: normalizeWeeks(savedState.weeks),
       settings: {
         name: typeof savedState.settings?.name === "string" ? savedState.settings.name : "",
         weeklyTarget: Number.isFinite(savedState.settings?.weeklyTarget)
@@ -267,8 +265,212 @@
     };
   }
 
+  function normalizeWeeks(savedWeeks) {
+    return Object.fromEntries(Object.entries(savedWeeks || {}).map(([weekKey, weekData]) => [
+      weekKey,
+      {
+        days: Object.fromEntries(Object.entries(weekData?.days || {}).map(([dayKey, day]) => [
+          dayKey,
+          normalizeDay(day, dayKey)
+        ]))
+      }
+    ]));
+  }
+
+  function normalizeDay(day, dayKey) {
+    const entries = Array.isArray(day?.entries)
+      ? day.entries
+        .filter((entry) => {
+          const isLegacyEntry = Object.hasOwn(entry || {}, "category")
+            && !Object.hasOwn(entry || {}, "description");
+          return !isLegacyEntry || Boolean(entry.from || entry.to);
+        })
+        .map((entry, index) => normalizeEntry(entry, dayKey, index))
+      : [];
+    return {
+      date: typeof day?.date === "string" ? day.date : dayKey,
+      weekday: typeof day?.weekday === "string" ? day.weekday : "",
+      dayType: typeof day?.dayType === "string" ? day.dayType : "workday",
+      allowHolidayWork: Boolean(day?.allowHolidayWork),
+      entries: entries.length > 0 ? entries : [createEmptyEntry()],
+      remark: typeof day?.remark === "string" ? day.remark : ""
+    };
+  }
+
+  function normalizeEntry(entry, dayKey, index) {
+    const normalized = {
+      id: typeof entry?.id === "string" && entry.id ? entry.id : `entry-${dayKey}-${index + 1}`,
+      description: typeof entry?.description === "string" ? entry.description : entry?.category || "",
+      start: typeof entry?.start === "string" ? entry.start : entry?.from || "",
+      end: typeof entry?.end === "string" ? entry.end : entry?.to || "",
+      duration: 0,
+      note: typeof entry?.note === "string" ? entry.note : ""
+    };
+    normalized.duration = getEntryDuration(normalized);
+    return normalized;
+  }
+
+  function createEmptyEntry() {
+    return {
+      id: createEntryId(),
+      description: "",
+      start: "",
+      end: "",
+      duration: 0,
+      note: ""
+    };
+  }
+
+  function createEntryId() {
+    if (typeof globalThis.crypto?.randomUUID === "function") {
+      return globalThis.crypto.randomUUID();
+    }
+    return `entry-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  }
+
   function saveState() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }
+
+  function saveBackup() {
+    const backup = {
+      format: "stundenrapport-backup",
+      version: BACKUP_VERSION,
+      exportedAt: new Date().toISOString(),
+      data: state,
+      selection: {
+        period: selectedPeriod,
+        date: selectedDate,
+        view: currentView
+      }
+    };
+    downloadFile(
+      `Stundenrapport_Backup_${getDateKey(new Date())}.json`,
+      JSON.stringify(backup, null, 2),
+      "application/json"
+    );
+    showBackupNotice("Backup wurde gespeichert.", false);
+  }
+
+  async function loadBackup() {
+    const file = backupFileInput.files && backupFileInput.files[0];
+    backupFileInput.value = "";
+    if (!file) {
+      return;
+    }
+
+    try {
+      const backup = JSON.parse(await file.text());
+      if (backup?.format !== "stundenrapport-backup"
+        || backup?.version !== BACKUP_VERSION
+        || !backup?.data?.weeks) {
+        throw new Error("Unbekanntes Backup-Format");
+      }
+      if (!window.confirm("Vorhandene Daten werden überschrieben. Fortfahren?")) {
+        return;
+      }
+
+      const restoredState = normalizeState(backup.data);
+      state.weeks = restoredState.weeks;
+      state.settings = restoredState.settings;
+
+      if (isAllowedPeriod(backup.selection?.period?.year, backup.selection?.period?.week)) {
+        selectedPeriod = {
+          year: backup.selection.period.year,
+          week: backup.selection.period.week
+        };
+      }
+      if (typeof backup.selection?.date === "string"
+        && /^\d{4}-\d{2}-\d{2}$/.test(backup.selection.date)) {
+        selectedDate = backup.selection.date;
+      }
+
+      saveState();
+      persistSelection();
+      render();
+      showBackupNotice("Backup wurde geladen.", false);
+    } catch (error) {
+      console.warn("Backup konnte nicht geladen werden.", error);
+      showBackupNotice("Die gewählte Datei ist kein gültiges Backup.", true);
+    }
+  }
+
+  function exportCsv() {
+    const rows = [[
+      "Datum",
+      "Wochentag",
+      "Kalenderwoche",
+      "Tagesart",
+      "Tätigkeit",
+      "Von",
+      "Bis",
+      "Dauer",
+      "Bemerkung"
+    ]];
+
+    getStoredDays().forEach(({ year, week, day }) => {
+      const entries = day.entries.filter((entry) => (
+        entry.start || entry.end || entry.description || entry.note
+      ));
+      if (entries.length === 0) {
+        rows.push(csvDayRow(year, week, day, null));
+        return;
+      }
+      entries.forEach((entry) => rows.push(csvDayRow(year, week, day, entry)));
+    });
+
+    const csv = rows.map((row) => row.map(csvCell).join(";")).join("\r\n");
+    downloadFile(
+      `Stundenrapport_Export_${getDateKey(new Date())}.csv`,
+      `\uFEFF${csv}`,
+      "text/csv;charset=utf-8"
+    );
+    showBackupNotice("CSV-Datei wurde erstellt.", false);
+  }
+
+  function csvDayRow(year, week, day, entry) {
+    return [
+      day.date,
+      day.weekday,
+      `KW ${String(week).padStart(2, "0")}/${year}`,
+      getDayTypeLabel(day),
+      entry?.description || "",
+      entry?.start || "",
+      entry?.end || "",
+      entry ? formatDecimal(getEntryDuration(entry)) : "",
+      [entry?.note, day.remark].filter(Boolean).join(" / ")
+    ];
+  }
+
+  function getStoredDays() {
+    return Object.entries(state.weeks)
+      .map(([key, weekData]) => ({ period: parsePeriodKey(key), weekData }))
+      .filter(({ period }) => Number.isFinite(period.year) && Number.isFinite(period.week))
+      .sort((left, right) => left.period.year - right.period.year || left.period.week - right.period.week)
+      .flatMap(({ period, weekData }) => Object.values(weekData.days || {})
+        .sort((left, right) => left.date.localeCompare(right.date))
+        .map((day) => ({ year: period.year, week: period.week, day })));
+  }
+
+  function csvCell(value) {
+    return `"${String(value ?? "").replace(/"/g, '""')}"`;
+  }
+
+  function downloadFile(fileName, content, mimeType) {
+    const url = URL.createObjectURL(new Blob([content], { type: mimeType }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function showBackupNotice(message, isError) {
+    backupNotice.textContent = message;
+    backupNotice.classList.toggle("error", Boolean(isError));
+    backupNotice.hidden = false;
   }
 
   function saveName(value) {
@@ -348,14 +550,17 @@
           weekday: dayName,
           dayType: "workday",
           allowHolidayWork: false,
-          entries: categories.map((category) => ({
-            category,
-            from: "",
-            to: ""
-          })),
+          entries: [createEmptyEntry()],
           remark: ""
         };
         changed = true;
+      } else {
+        const currentDay = state.weeks[key].days[dayKey];
+        const normalizedDay = normalizeDay(currentDay, dayKey);
+        if (JSON.stringify(currentDay) !== JSON.stringify(normalizedDay)) {
+          state.weeks[key].days[dayKey] = normalizedDay;
+          changed = true;
+        }
       }
     });
     if (changed) {
@@ -458,6 +663,14 @@
       day.entries.forEach((entry, entryIndex) => {
         entries.appendChild(createEntryRow(day.date, entry, entryIndex));
       });
+      const addEntryButton = template.querySelector(".add-entry-button");
+      addEntryButton.disabled = isReadOnlyDay;
+      addEntryButton.addEventListener("click", () => {
+        day.entries.push(createEmptyEntry());
+        saveState();
+        renderEntryView();
+        renderReport();
+      });
 
       const textarea = template.querySelector("textarea");
       textarea.value = day.remark || "";
@@ -478,28 +691,78 @@
     row.dataset.dayKey = dayKey;
     row.dataset.entryIndex = entryIndex;
 
-    const title = document.createElement("div");
-    title.className = "entry-title";
-    title.textContent = entry.category;
-
     const day = state.weeks[periodKey(selectedPeriod.year, selectedPeriod.week)].days[dayKey];
     const isHolidayLocked = isHoliday(new Date(`${dayKey}T00:00:00`)) && !day.allowHolidayWork && day.dayType === "workday";
     const isReadOnly = day.dayType !== "workday" || isHolidayLocked;
 
+    const descriptionLabel = document.createElement("label");
+    descriptionLabel.className = "description-field";
+    descriptionLabel.innerHTML = '<span class="entry-label">Tätigkeit</span>';
+    descriptionLabel.appendChild(createEntryTextInput(
+      dayKey,
+      entryIndex,
+      "description",
+      entry.description,
+      "Tätigkeit eingeben",
+      isReadOnly
+    ));
+
     const fromLabel = document.createElement("label");
-    fromLabel.innerHTML = '<span class="time-label">Von</span>';
-    fromLabel.appendChild(createTimeInput(dayKey, entryIndex, "from", entry.from || "", isReadOnly));
+    fromLabel.innerHTML = '<span class="entry-label">Von</span>';
+    fromLabel.appendChild(createTimeInput(dayKey, entryIndex, "start", entry.start || "", isReadOnly));
 
     const toLabel = document.createElement("label");
-    toLabel.innerHTML = '<span class="time-label">Bis</span>';
-    toLabel.appendChild(createTimeInput(dayKey, entryIndex, "to", entry.to || "", isReadOnly));
+    toLabel.innerHTML = '<span class="entry-label">Bis</span>';
+    toLabel.appendChild(createTimeInput(dayKey, entryIndex, "end", entry.end || "", isReadOnly));
 
     const duration = document.createElement("div");
     duration.className = "duration";
-    duration.textContent = formatHours(getEntryDuration(entry));
+    duration.innerHTML = `<span class="entry-label">Dauer</span><strong>${formatHours(getEntryDuration(entry))}</strong>`;
 
-    row.append(title, fromLabel, toLabel, duration);
+    const noteLabel = document.createElement("label");
+    noteLabel.className = "entry-note-field";
+    noteLabel.innerHTML = '<span class="entry-label">Bemerkung</span>';
+    noteLabel.appendChild(createEntryTextInput(
+      dayKey,
+      entryIndex,
+      "note",
+      entry.note,
+      "Optional",
+      isReadOnly
+    ));
+
+    const deleteButton = document.createElement("button");
+    deleteButton.type = "button";
+    deleteButton.className = "delete-entry-button";
+    deleteButton.textContent = "Zeile löschen";
+    deleteButton.disabled = isReadOnly;
+    deleteButton.addEventListener("click", () => removeEntry(dayKey, entryIndex));
+
+    row.append(descriptionLabel, fromLabel, toLabel, duration, noteLabel, deleteButton);
     return row;
+  }
+
+  function createEntryTextInput(dayKey, entryIndex, field, value, placeholder, isReadOnly) {
+    const input = document.createElement("input");
+    input.type = "text";
+    input.inputMode = "text";
+    input.autocomplete = "off";
+    input.spellcheck = false;
+    input.placeholder = placeholder;
+    input.value = value || "";
+    input.disabled = isReadOnly;
+    input.addEventListener("input", () => updateEntry(dayKey, entryIndex, field, input.value));
+    return input;
+  }
+
+  function removeEntry(dayKey, entryIndex) {
+    const day = state.weeks[periodKey(selectedPeriod.year, selectedPeriod.week)].days[dayKey];
+    day.entries.splice(entryIndex, 1);
+    if (day.entries.length === 0) {
+      day.entries.push(createEmptyEntry());
+    }
+    saveState();
+    render();
   }
 
   function createTimeInput(dayKey, entryIndex, field, initialValue, isReadOnly) {
@@ -564,6 +827,7 @@
       return;
     }
     entry[field] = value;
+    entry.duration = getEntryDuration(entry);
     saveState();
     window.requestAnimationFrame(() => {
       renderDashboard();
@@ -579,7 +843,7 @@
     }
     const day = state.weeks[periodKey(selectedPeriod.year, selectedPeriod.week)].days[dayKey];
     const entry = day.entries[entryIndex];
-    row.querySelector(".duration").textContent = formatHours(getEntryDuration(entry));
+    row.querySelector(".duration strong").textContent = formatHours(getEntryDuration(entry));
     const card = row.closest(".day-card");
     if (card) {
       const total = getDayTotal(day);
@@ -937,11 +1201,24 @@
     const dayType = getDayTypeLabel(day);
     const holidayDate = isHoliday(date);
     const dayLabel = holidayDate ? `${dayType} - Feiertag` : dayType;
-    const timeEntries = day.entries
-      .filter((entry) => entry.from || entry.to)
-      .map((entry) => `${entry.category}: ${entry.from || "-"} - ${entry.to || "-"}`);
+    const reportEntries = day.entries.filter((entry) => (
+      entry.description || entry.start || entry.end || entry.note
+    ));
+    const timeEntries = reportEntries.map((entry) => {
+      const description = escapeHtml(entry.description || "Ohne Tätigkeit");
+      const time = `${escapeHtml(entry.start || "-")} - ${escapeHtml(entry.end || "-")}`;
+      return `<div class="report-entry">
+        <strong>${description}</strong>
+        <span>${time}</span>
+        <span>${formatHours(getEntryDuration(entry))}</span>
+      </div>`;
+    });
     const timesText = timeEntries.length > 0 ? timeEntries.join("<br>") : "";
-    const remark = day.remark ? escapeHtml(day.remark) : "";
+    const remarks = reportEntries
+      .map((entry) => entry.note)
+      .filter(Boolean)
+      .concat(day.remark ? [day.remark] : []);
+    const remark = remarks.map(escapeHtml).join("<br>");
     return `<tr>
       <td>${escapeHtml(formatDate(date))}</td>
       <td>${escapeHtml(day.weekday)}</td>
@@ -1030,11 +1307,16 @@
   }
 
   function getEntryDuration(entry) {
-    if (!entry.from || !entry.to) {
+    if (!entry.start || !entry.end) {
       return 0;
     }
-    const from = timeToMinutes(entry.from);
-    const to = timeToMinutes(entry.to);
+    const parsedStart = parseTimeInput(entry.start);
+    const parsedEnd = parseTimeInput(entry.end);
+    if (!parsedStart.valid || !parsedEnd.valid) {
+      return 0;
+    }
+    const from = timeToMinutes(parsedStart.value);
+    const to = timeToMinutes(parsedEnd.value);
     if (to <= from) {
       return 0;
     }

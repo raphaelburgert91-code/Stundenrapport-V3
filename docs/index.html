@@ -184,6 +184,16 @@
             <input id="settingsYearInput" type="number" inputmode="numeric" min="2026" step="1" placeholder="2026">
           </label>
           <p class="helper-text">Alle Einstellungen werden lokal gespeichert und bleiben auf diesem Gerät erhalten.</p>
+          <div class="backup-section">
+            <h2>Datensicherung</h2>
+            <div class="backup-actions">
+              <button id="backupSaveButton" class="primary" type="button">Backup speichern</button>
+              <button id="backupLoadButton" type="button">Backup laden</button>
+              <button id="csvExportButton" type="button">Daten exportieren (CSV)</button>
+              <input id="backupFileInput" class="file-input" type="file" accept="application/json,.json">
+            </div>
+            <p id="backupNotice" class="backup-notice" role="status" aria-live="polite" hidden></p>
+          </div>
         </div>
       </section>
 
@@ -228,8 +238,9 @@
           <div class="day-target-pill">Soll: 0,00 h</div>
         </div>
         <div class="entries"></div>
+        <button class="add-entry-button" type="button">+ Zeile hinzufügen</button>
         <label class="remarks">
-          <span>Bemerkungen</span>
+          <span>Tagesbemerkung</span>
           <textarea rows="2" inputmode="text"></textarea>
         </label>
       </article>

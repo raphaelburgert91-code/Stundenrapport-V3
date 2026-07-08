@@ -4,11 +4,17 @@
 
 ### Added
 
+- JSON-Backup zum Speichern und Wiederherstellen aller lokalen Daten.
+- CSV-Export mit einer Zeile pro Buchung.
+- Flexible Buchungszeilen mit Tätigkeit, Zeit, Dauer und optionaler Bemerkung.
 - Project structure template folders added for source, data, assets, export, tests, scripts and reference.
 - AGENTS guidance document created for future development work.
 
 ### Changed
 
+- Bestehende Kategorien werden automatisch in flexible Buchungszeilen migriert.
+- Wochenrapport und Summen verwenden alle flexiblen Buchungszeilen.
+- Service-Worker-Cache auf Version 3 aktualisiert.
 - README expanded with project overview, build instructions, GitHub Pages information and installation guidance.
 - .gitignore updated for a web app workflow.
 
