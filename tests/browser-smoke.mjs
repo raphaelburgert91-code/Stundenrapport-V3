@@ -170,8 +170,8 @@ const migrationState = {
   }
 };
 
-await evaluate(`localStorage.setItem("stundenrapport-mama-v2", ${JSON.stringify(JSON.stringify(migrationState))});
-  localStorage.setItem("stundenrapport-last-period", "2026-W27");
+await evaluate(`localStorage.setItem("stundenrapport-mama-v3", ${JSON.stringify(JSON.stringify(migrationState))});
+  localStorage.setItem("stundenrapport-v3-last-period", "2026-W27");
   location.reload();`);
 await wait(700);
 assert.equal(await evaluate(`document.querySelector(".description-field input").value`), "Alte Kategorie");

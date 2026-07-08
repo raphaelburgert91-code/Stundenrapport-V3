@@ -12,6 +12,7 @@
 
 ### Changed
 
+- V3 verwendet eigene Browser-Speicherschlüssel und eine eigene PWA-Identität, getrennt von V2.
 - Bestehende Kategorien werden automatisch in flexible Buchungszeilen migriert.
 - Wochenrapport und Summen verwenden alle flexiblen Buchungszeilen.
 - Service-Worker-Cache auf Version 3 aktualisiert.

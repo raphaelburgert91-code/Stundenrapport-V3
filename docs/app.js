@@ -6,12 +6,12 @@
   const END_YEAR = Math.max(new Date().getFullYear() + 10, 2036);
   const DEFAULT_WEEKLY_TARGET = 20.44;
   const DEFAULT_START_CARRY = 36.12;
-  const STORAGE_KEY = "stundenrapport-mama-v2";
-  const OLD_STORAGE_KEY = "stundenrapport-christiane-burgert";
-  const LAST_PERIOD_KEY = "stundenrapport-last-period";
-  const LAST_DATE_KEY = "stundenrapport-last-date";
-  const LAST_VIEW_KEY = "stundenrapport-last-view";
-  const OLD_LAST_WEEK_KEY = "stundenrapport-last-week";
+  const STORAGE_KEY = "stundenrapport-mama-v3";
+  const OLD_STORAGE_KEY = "stundenrapport-v3-legacy";
+  const LAST_PERIOD_KEY = "stundenrapport-v3-last-period";
+  const LAST_DATE_KEY = "stundenrapport-v3-last-date";
+  const LAST_VIEW_KEY = "stundenrapport-v3-last-view";
+  const OLD_LAST_WEEK_KEY = "stundenrapport-v3-last-week";
   const BACKUP_VERSION = 1;
 
   const dayNames = ["Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag"];

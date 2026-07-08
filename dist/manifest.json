@@ -1,6 +1,7 @@
 {
-  "name": "Arbeitsstunden",
-  "short_name": "Stunden",
+  "name": "Arbeitsstunden V3",
+  "short_name": "Stunden V3",
+  "id": "./",
   "description": "Einfache Arbeitszeiterfassung fur Christiane Burgert",
   "start_url": "./index.html",
   "scope": "./",
